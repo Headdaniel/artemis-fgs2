@@ -276,8 +276,10 @@ section{margin-bottom:20px}
   .btn-refresh{padding:9px 18px}
   .meta-top .big{font-size:28px}
   .kpi .value{font-size:26px}
-  .footer-logos{gap:18px 22px}
-  .footer-logos img{height:34px}
+   /* Footer móvil: 4 logos en una fila igualada + ChangeLab abajo solo */
+  .footer-logos{display:flex;flex-wrap:wrap;gap:14px 10px;justify-content:center;align-items:center}
+  .footer-logos img{height:30px;flex:0 0 auto}
+  .footer-logos .logo-clab{flex-basis:100%;height:34px;margin-top:6px}
 }
 
 .satin {
@@ -421,7 +423,7 @@ section{margin-bottom:20px}
       <img src="Comuna Seis (B)H.png" alt="Comuna Seis — estrategia de territorio (Fundación Grupo Social)">
       <img src="3. Fundació-Santo_Domingo-logotipo_BLANCO.png" alt="Fundación Santo Domingo">
       <img src="4. B - logo Vertical Blanco.png" alt="Estrategia de territorio (Fundación Santo Domingo)">
-      <img src="Logo CLab_Negativo.png" alt="ChangeLab">
+      <img src="Logo CLab_Negativo.png" alt="ChangeLab" class="logo-clab">
     </div>
   </div>
 </footer>
