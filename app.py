@@ -1,83 +1,75 @@
 """
 Backend del Tablero — Ruta de Emprendimientos de Base (Comuna 6, Cartagena)
 ============================================================================
-Versión para Hugging Face Spaces con SDK **Gradio** (gratis).
+Versión Flask para desplegar en Render (plan Web Service Free).
 
-Mantiene EXACTAMENTE la misma lógica que la versión Flask:
   1. Sirve el tablero (index.html) y sus archivos (logos, etc.) en "/".
-  2. /api/datos  → lee la hoja "Agregados" del Google Sheet y la reenvía.
+  2. /api/datos   → lee la hoja "Agregados" del Google Sheet y la reenvía.
   3. /api/lectura → arma el resumen y pide a Groq la interpretación.
 
-La diferencia es sólo el "envoltorio": en vez de Flask, usamos FastAPI y
-montamos una app Gradio mínima encima, porque HF Spaces gratis corre Gradio.
-Tu index.html NO cambia: sigue llamando a /api/datos y /api/lectura.
-
 La clave de Groq NUNCA va en el código: se lee de las variables de entorno.
-En HF Spaces se configura en  Settings → Variables and secrets → New secret:
+En Render se configura en:  Environment → Add Environment Variable
     GROQ_API_KEY = tu_clave_gsk_...
-    (opcional) GROQ_MODELO = openai/gpt-oss-120b
+    GROQ_MODELO  = openai/gpt-oss-120b
+
+Render asigna el puerto por la variable PORT (este código ya la lee).
+Comandos de despliegue en Render:
+    Build:  pip install -r requirements.txt
+    Start:  python app.py
 """
 
 import os
 import json
-import urllib.request
-import urllib.error
 from datetime import datetime
-from pathlib import Path
 
-import gradio as gr
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, Response, FileResponse
+from flask import Flask, jsonify, request, send_from_directory
+import urllib.request
 
-# ----------------------------------------------------------------------------
-# CONFIGURACIÓN (se lee de variables de entorno; en local puede usar .env)
-# ----------------------------------------------------------------------------
+# .env es opcional (solo local); en Render no hace falta
 try:
-    from dotenv import load_dotenv  # opcional en local; en HF no hace falta
+    from dotenv import load_dotenv
     load_dotenv()
 except Exception:
     pass
 
+app = Flask(__name__, static_folder=".", static_url_path="")
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN
+# ----------------------------------------------------------------------------
 SHEET_CSV_URL = os.getenv(
     "SHEET_CSV_URL",
     "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNF5FC6bM-aPr9iJ5WnV04EPTNUNQ_uHpW6rZGOUUTT22gw2jQG_e-i88nlQQzejFsQKUbWLYtqj1s/pub?gid=793554120&single=true&output=csv",
 )
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODELO = os.getenv("GROQ_MODELO", "openai/gpt-oss-120b")
-PORT = int(os.getenv("PORT", "7860"))
+PORT = int(os.getenv("PORT", "8000"))  # Render inyecta PORT automáticamente
 
-BASE_DIR = Path(__file__).parent.resolve()
 
-# ----------------------------------------------------------------------------
-# App FastAPI (es la que realmente sirve el tablero y las rutas /api/*)
-# ----------------------------------------------------------------------------
-app = FastAPI()
+# ---- RUTA 1: servir el tablero ---------------------------------------------
+@app.route("/")
+def home():
+    return send_from_directory(".", "index.html")
 
 
 # ---- RUTA 2: proxy del Google Sheet ----------------------------------------
-@app.get("/api/datos")
+@app.route("/api/datos")
 def api_datos():
     try:
         with urllib.request.urlopen(SHEET_CSV_URL, timeout=15) as resp:
             csv_text = resp.read().decode("utf-8")
-        return Response(content=csv_text, media_type="text/csv")
+        return app.response_class(csv_text, mimetype="text/csv")
     except Exception as e:
-        return JSONResponse({"error": f"No se pudo leer la hoja: {e}"}, status_code=502)
+        return jsonify({"error": f"No se pudo leer la hoja: {e}"}), 502
 
 
 # ---- RUTA 3: interpretación con Groq ---------------------------------------
-@app.post("/api/lectura")
-async def api_lectura(request: Request):
+@app.route("/api/lectura", methods=["POST"])
+def api_lectura():
     if not GROQ_API_KEY:
-        return JSONResponse(
-            {"error": "Falta GROQ_API_KEY en las variables/secrets del Space."},
-            status_code=500,
-        )
+        return jsonify({"error": "Falta GROQ_API_KEY en las variables de entorno."}), 500
 
-    try:
-        datos = await request.json()
-    except Exception:
-        datos = {}
+    datos = request.get_json(force=True, silent=True) or {}
     resumen = datos.get("resumen", {})
     saludo = datos.get("saludo", "Hola, equipo")
 
@@ -106,7 +98,7 @@ async def api_lectura(request: Request):
             ],
         )
         texto = completion.choices[0].message.content
-        return JSONResponse({
+        return jsonify({
             "texto": texto or "El modelo no devolvió texto.",
             "generado": datetime.now().isoformat(timespec="minutes"),
         })
@@ -115,45 +107,10 @@ async def api_lectura(request: Request):
         print("Detalle:", repr(e))
         print("Modelo usado:", GROQ_MODELO)
         print("=========================\n")
-        return JSONResponse({"error": f"No se pudo generar la lectura: {e}"}, status_code=502)
+        return jsonify({"error": f"No se pudo generar la lectura: {e}"}), 502
 
 
-# ---- RUTA 1: servir el tablero y sus archivos (logos, etc.) ----------------
-# Servimos index.html en "/" y cualquier archivo (PNG de logos) por su nombre.
-@app.get("/")
-def home():
-    return FileResponse(BASE_DIR / "index.html")
-
-
-@app.get("/{filename}")
-def archivo(filename: str):
-    # sólo sirve archivos que existan en la carpeta del proyecto (logos, etc.)
-    f = (BASE_DIR / filename).resolve()
-    if f.is_file() and str(f).startswith(str(BASE_DIR)):
-        return FileResponse(f)
-    return JSONResponse({"error": "no encontrado"}, status_code=404)
-
-
-# ----------------------------------------------------------------------------
-# Gradio: HF Spaces (SDK Gradio) necesita una app Gradio presente.
-# Montamos una app Gradio mínima e invisible en /_panel; el tablero real vive en "/".
-# ----------------------------------------------------------------------------
-with gr.Blocks() as panel:
-    gr.Markdown("Servicio del tablero activo. Abre la raíz del sitio para verlo.")
-
-app = gr.mount_gradio_app(app, panel, path="/_panel")
-
-
-# ----------------------------------------------------------------------------
-# Arranque
-# ----------------------------------------------------------------------------
-# En Hugging Face Spaces (SDK Gradio) NO se debe llamar a uvicorn.run():
-# la plataforma detecta la variable `app` y la sirve automáticamente en el
-# puerto 7860. Arrancarla aquí de nuevo choca el puerto ("address already in use").
-#
-# Para correr en LOCAL, usa este comando en la terminal (no ejecutes este archivo
-# directamente con `python app.py` en local si quieres el mismo comportamiento):
-#     uvicorn app:app --host 0.0.0.0 --port 7860
-#
-# Dejamos el print informativo, pero sin arrancar el servidor a mano.
-print(f"App lista. Groq {'configurado ✓' if GROQ_API_KEY else 'SIN clave ✗'}")
+if __name__ == "__main__":
+    print(f"Tablero corriendo en el puerto {PORT}")
+    print(f"Groq {'configurado ✓' if GROQ_API_KEY else 'SIN clave (configura la variable de entorno) ✗'}")
+    app.run(host="0.0.0.0", port=PORT, debug=False)
