@@ -276,13 +276,15 @@ section{margin-bottom:20px}
   .btn-refresh{padding:9px 18px}
   .meta-top .big{font-size:28px}
   .kpi .value{font-size:26px}
-  /* Footer móvil: FGS (fila 1), FSD (fila 2), ChangeLab (fila 3) */
-  .footer-logos{display:grid;grid-template-columns:auto auto;justify-content:center;
-    align-items:center;gap:16px 22px}
-  .footer-logos img{height:32px}
-  .footer-logos .lg-fgs{grid-row:1}
-  .footer-logos .lg-fsd{grid-row:2}
-  .footer-logos .logo-clab{grid-row:3;grid-column:1 / -1;height:34px;margin-top:4px}
+  /* Footer móvil: FGS+Comuna (fila 1), FSD+Bicentenario (fila 2), ChangeLab (fila 3) */
+  .footer-logos{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:18px 24px}
+  .footer-logos img{height:34px}
+  /* salto de fila después del 2º logo FGS y del 2º FSD */
+  .footer-logos .lg-fgs:nth-of-type(2){margin-right:9999px}
+  .footer-logos .lg-fsd:nth-of-type(2){margin-right:9999px}
+  /* FSD y Bicentenario más grandes: su PNG trae mucho margen transparente */
+  .footer-logos .lg-fsd{height:48px}
+  .footer-logos .logo-clab{height:34px}
 }
 
 .satin {
