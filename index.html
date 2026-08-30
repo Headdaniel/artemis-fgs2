@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evaluación de impacto Comuna 6 — Tablero en tiempo real</title>
+
+<!-- ==================== LIBRERÍAS (CDN cdnjs) ==================== -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<style>
+/* ==================== IDENTIDAD GRÁFICA ==================== */
+:root{
+  --azul:#143980;      /* principal: encabezados y estructura */
+  --naranja:#ee6802;   /* acentos y avance/alertas */
+  --cian:#00b2bb;      /* datos secundarios */
+  --blanco:#ffffff;
+  --gris-bg:#eef1f6;
+  --gris-linea:#d9e0ec;
+  --gris-texto:#5a6478;
+  --azul-suave:#e8edf7;
+  --cian-suave:#e0f7f8;
+  --naranja-suave:#fdecdd;
+  --sombra:0 1px 3px rgba(20,57,128,.10),0 1px 2px rgba(20,57,128,.06);
+  --radio:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--gris-bg);
+  color:#1c2333;
+  line-height:1.45;
+  padding-bottom:40px;
+}
+h1,h2,h3{line-height:1.2;letter-spacing:-.01em}
+
+/* ---------- Encabezado ---------- */
+header{
+  background:var(--azul);
+  color:var(--blanco);
+  padding:14px 16px 16px;
+  position:sticky;top:0;z-index:1200;
+  box-shadow:0 2px 12px rgba(20,57,128,.25);
+}
+.header-top{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.logo-box{height:48px;display:flex;align-items:center;flex-shrink:0}
+.logo-ruta{max-height:48px;width:auto;object-fit:contain;display:block}
+.brand .divider{width:1px;height:38px;background:rgba(255,255,255,.28);flex-shrink:0}
+.header-center{min-width:0}
+.header-center h1{font-size:17px;font-weight:700}
+.header-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0}
+.artemis-sig{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.artemis-sig .by{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#93a6cf;font-weight:600}
+.logo-artemis{height:22px;width:auto;object-fit:contain;opacity:.95}
+.status-row{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-top:12px;flex-wrap:wrap;
+}
+.last-update{font-size:12px;color:#c3d0ec;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--cian);
+  box-shadow:0 0 0 0 rgba(0,178,187,.6);animation:pulse 2s infinite}
+.dot.error{background:var(--naranja);animation:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,178,187,.5)}70%{box-shadow:0 0 0 7px rgba(0,178,187,0)}100%{box-shadow:0 0 0 0 rgba(0,178,187,0)}}
+.btn-refresh{
+  background:var(--naranja);color:#fff;border:0;border-radius:999px;
+  padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;transition:filter .15s;
+}
+.btn-refresh:hover{filter:brightness(1.08)}
+.btn-refresh:active{transform:scale(.97)}
+.btn-refresh:disabled{opacity:.6;cursor:wait}
+.btn-refresh svg{width:15px;height:15px}
+.spin{animation:rot 1s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ---------- Bienvenida ---------- */
+.welcome{
+  background:linear-gradient(135deg,var(--cian),#0899a1);
+  color:#fff;border-radius:var(--radio);padding:14px 16px;
+  margin-bottom:18px;font-size:13.5px;line-height:1.5;
+  box-shadow:var(--sombra);display:flex;gap:10px;align-items:flex-start;
+}
+.welcome svg{flex-shrink:0;margin-top:2px}
+
+/* ---------- Contenedor ---------- */
+main{max-width:1080px;margin:0 auto;padding:16px 14px}
+section{margin-bottom:20px}
+.section-title{
+  font-size:13px;font-weight:700;color:var(--azul);
+  text-transform:uppercase;letter-spacing:.06em;
+  margin:0 2px 10px;display:flex;align-items:center;gap:8px;
+}
+.section-title::before{content:"";width:3px;height:15px;background:var(--naranja);border-radius:2px}
+
+/* ---------- KPIs ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.kpi{
+  background:var(--blanco);border-radius:var(--radio);padding:14px;
+  box-shadow:var(--sombra);border:1px solid var(--gris-linea);
+  display:flex;flex-direction:column;gap:2px;border-top:3px solid var(--azul);
+}
+.kpi .label{font-size:11px;color:var(--gris-texto);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.kpi .value{font-size:30px;font-weight:800;color:var(--azul);line-height:1;margin-top:4px}
+.kpi .value small{font-size:15px;font-weight:600;color:var(--gris-texto)}
+.kpi .sub{font-size:12px;color:var(--gris-texto)}
+.kpi.wide{grid-column:1/-1}
+
+/* variantes de color por indicador */
+.kpi.k-naranja{border-top-color:var(--naranja);background:var(--naranja-suave)}
+.kpi.k-naranja .value{color:var(--naranja)}
+.kpi.k-cian{border-top-color:var(--cian);background:var(--cian-suave)}
+.kpi.k-cian .value{color:#0899a1}
+.kpi.k-azul{border-top-color:var(--azul);background:var(--azul-suave)}
+
+/* barra de progreso hacia la meta */
+.meta-card{
+  background:linear-gradient(135deg,var(--azul),#1d4aa0);
+  color:#fff;border:0;grid-column:1/-1;border-top:0;
+}
+.meta-card .label{color:#c3d0ec}
+.meta-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.meta-top .big{font-size:34px;font-weight:800;line-height:1}
+.meta-top .pct{font-size:22px;font-weight:800;color:var(--naranja)}
+.progress{height:14px;background:rgba(255,255,255,.18);border-radius:999px;overflow:hidden;margin-top:12px}
+.progress > i{
+  display:block;height:100%;background:var(--naranja);border-radius:999px;
+  width:0;transition:width .8s cubic-bezier(.2,.7,.2,1);
+  box-shadow:0 0 12px rgba(238,104,2,.5);
+}
+.meta-foot{display:flex;justify-content:space-between;font-size:12px;color:#c3d0ec;margin-top:7px}
+
+/* ---------- Tarjetas contenedoras ---------- */
+.card{
+  background:var(--blanco);border-radius:var(--radio);
+  box-shadow:var(--sombra);border:1px solid var(--gris-linea);
+  padding:14px;overflow:hidden;
+}
+.card h3{font-size:14px;color:var(--azul);margin-bottom:10px}
+
+/* ---------- Mapa ---------- */
+#map{height:340px;width:100%;border-radius:10px;z-index:1;background:var(--azul-suave)}
+.leaflet-popup-content,.leaflet-tooltip{font-size:13px}
+.leaflet-popup-content b,.leaflet-tooltip b{color:var(--azul)}
+.barrio-tip{background:#fff;border:1px solid var(--gris-linea);border-radius:8px;
+  box-shadow:var(--sombra);padding:7px 10px;font-size:12.5px;color:#1c2333}
+.barrio-tip .pctval{color:var(--naranja);font-weight:800}
+.map-note{font-size:11px;color:var(--gris-texto);margin-top:8px}
+
+/* ---------- Avance por Fundación ---------- */
+.fund-list{display:flex;flex-direction:column;gap:14px}
+.fund{background:var(--blanco)}
+.fund .fh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:2px}
+.fund .fname{font-size:14px;font-weight:700;color:var(--azul)}
+.fund .fcount{font-size:13px;color:var(--gris-texto)}
+.fund .fcount b{color:var(--azul);font-size:20px}
+.fund .fpct{font-size:20px;font-weight:800}
+.fund .fbar{height:12px;background:var(--azul-suave);border-radius:999px;overflow:hidden;margin-top:8px}
+.fund .fbar > i{display:block;height:100%;border-radius:999px;width:0;transition:width .8s cubic-bezier(.2,.7,.2,1)}
+.fund.f1 .fpct{color:var(--naranja)} .fund.f1 .fbar > i{background:var(--naranja)}
+.fund.f2 .fpct{color:#0899a1}       .fund.f2 .fbar > i{background:var(--cian)}
+.fund .fmeta{font-size:11px;color:var(--gris-texto);margin-top:5px}
+
+/* ---------- Gráficos ---------- */
+.chart-wrap{position:relative;width:100%}
+.chart-wrap.tall{height:420px}
+.chart-wrap.med{height:300px}
+
+/* ---------- Encuestadores ---------- */
+.surv-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.surv{
+  background:var(--blanco);border:1px solid var(--gris-linea);border-radius:12px;
+  padding:12px;box-shadow:var(--sombra);position:relative;overflow:hidden;
+}
+.surv::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cian)}
+.surv .name{font-size:12px;font-weight:700;color:var(--azul);margin-bottom:2px}
+.surv .n{font-size:26px;font-weight:800;color:var(--azul);line-height:1}
+.surv .bar{height:6px;background:var(--azul-suave);border-radius:999px;margin-top:8px;overflow:hidden}
+.surv .bar > i{display:block;height:100%;background:var(--cian);width:0;transition:width .7s}
+.surv .pct{font-size:11px;color:var(--gris-texto);margin-top:5px}
+
+/* ---------- Tabla últimas encuestas ---------- */
+.recent{display:flex;flex-direction:column;gap:0}
+.recent .row{
+  display:grid;grid-template-columns:1fr auto;gap:2px 10px;
+  padding:11px 4px;border-bottom:1px solid var(--gris-linea);
+}
+.recent .row:last-child{border-bottom:0}
+.recent .barrio{font-size:14px;font-weight:600;color:#1c2333}
+.recent .tipo{font-size:12px;color:var(--gris-texto);grid-column:1}
+.recent .meta-r{text-align:right;font-size:12px;color:var(--gris-texto)}
+.recent .surv-tag{display:inline-block;font-size:11px;font-weight:700;color:var(--cian)}
+.recent .fecha{font-size:11px;color:#9aa4b8;display:block}
+
+/* ---------- Panel IA ---------- */
+.ia-card{border:1px solid var(--gris-linea);border-radius:var(--radio);background:var(--blanco);box-shadow:var(--sombra);overflow:hidden}
+.ia-head{background:var(--cian);color:#003a3d;padding:12px 14px;display:flex;align-items:center;gap:8px}
+.ia-head h3{color:#003a3d;margin:0;font-size:15px}
+.ia-body{padding:14px}
+.ia-body p.desc{font-size:12px;color:var(--gris-texto);margin-bottom:10px}
+.btn-ia{
+  background:var(--azul);color:#fff;border:0;border-radius:9px;padding:11px 16px;
+  font-size:14px;font-weight:700;cursor:pointer;width:100%;transition:filter .15s;
+}
+.btn-ia:hover{filter:brightness(1.1)}
+.btn-ia:disabled{opacity:.6;cursor:wait}
+.ia-out{
+  margin-top:12px;padding:13px;background:var(--azul-suave);border-radius:9px;
+  font-size:14px;line-height:1.55;white-space:pre-wrap;color:#1c2333;
+  border-left:3px solid var(--naranja);
+}
+.ia-stamp{font-size:11px;color:var(--gris-texto);margin-top:8px;text-align:right}
+
+/* ---------- Footer (organizaciones aliadas) ---------- */
+.site-footer{
+  background:var(--azul);color:#fff;margin-top:32px;padding:24px 16px 28px;
+}
+.footer-inner{max-width:1080px;margin:0 auto;text-align:center}
+.footer-inner .flabel{
+  font-size:11px;text-transform:uppercase;letter-spacing:.12em;
+  color:#93a6cf;font-weight:700;margin-bottom:16px;
+}
+.footer-logos{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  gap:22px 30px;
+}
+.footer-logos img{height:42px;width:auto;object-fit:contain;opacity:.95;
+  transition:opacity .15s}
+.footer-logos img:hover{opacity:1}
+
+/* ---------- Estados ---------- */
+.banner{
+  padding:11px 14px;border-radius:10px;font-size:13px;margin-bottom:16px;
+  display:none;align-items:center;gap:8px;
+}
+.banner.show{display:flex}
+.banner.error{background:#fdeee2;color:#a34a00;border:1px solid #f6c99a}
+.banner.empty{background:var(--azul-suave);color:var(--azul);border:1px solid var(--gris-linea)}
+.skeleton{color:var(--gris-texto);font-size:13px;text-align:center;padding:24px}
+
+/* ---------- Responsive ---------- */
+@media(min-width:640px){
+  .header-center h1{font-size:20px}
+  .logo-box{height:54px}
+  .logo-ruta{max-height:54px}
+  .brand .divider{height:44px}
+  .logo-artemis{height:26px}
+  .kpi-grid{grid-template-columns:repeat(4,1fr)}
+  .meta-card,.kpi.wide{grid-column:span 4}
+  .surv-grid{grid-template-columns:repeat(4,1fr)}
+  #map{height:420px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  .two-col section{margin-bottom:0}
+  .kpi.meta-card{grid-column:1/-1}
+}
+/* Móvil vertical: header apilado y legible */
+@media(max-width:520px){
+  .header-top{flex-wrap:wrap}
+  .brand{flex-basis:100%;gap:11px}
+  .logo-box{height:40px}
+  .logo-ruta{max-height:40px}
+  .brand .divider{height:32px}
+  .header-center h1{font-size:14.5px}
+  .header-right{flex-basis:100%;flex-direction:row;align-items:center;justify-content:space-between;margin-top:10px}
+  .artemis-sig{flex-direction:row;align-items:center;gap:7px}
+  .logo-artemis{height:20px}
+  .meta-top .big{font-size:28px}
+  .kpi .value{font-size:26px}
+  .footer-logos{gap:18px 22px}
+  .footer-logos img{height:34px}
+}
+
+.satin {
+  background: linear-gradient(115deg, #00212c, #196a8f 55%, #a44a7f);
+  background-size: 250% 250%;
+  animation: flow 9s ease-in-out infinite alternate;
+}
+
+@keyframes flow {
+  0% { background-position: 0 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ==================== ENCABEZADO ==================== -->
+<header>
+  <div class="header-top">
+    <div class="brand">
+      <!-- Logo del programa (izquierda). Debe estar junto al HTML -->
+      <span class="logo-box"><img class="logo-ruta" src="Logo de la Ruta-blanco.png" alt="Ruta de Emprendimientos de Base"></span>
+      <span class="divider"></span>
+      <div class="header-center">
+        <h1>Evaluación de impacto — Tablero de visualización en tiempo real</h1>
+      </div>
+    </div>
+    <div class="header-right">
+      <!-- Logo Artemis como firma discreta del proveedor (derecha, encima del botón). Debe estar junto al HTML -->
+      <div class="artemis-sig">
+        <span class="by">Desarrollado por</span>
+        <img class="logo-artemis" src="20.05 Logo Artemis-06 (1).png" alt="Artemis">
+      </div>
+      <button class="btn-refresh" id="btnRefresh" onclick="cargarDatos()">
+        <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+        Actualizar
+      </button>
+    </div>
+  </div>
+  <div class="status-row">
+    <div class="last-update"><span class="dot" id="statusDot"></span><span id="lastUpdate">Cargando datos…</span></div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ==================== BIENVENIDA ==================== -->
+  <div class="welcome">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <span>Te damos la bienvenida al servicio de monitoreo de Evaluación de Impacto de la Ruta. Aquí podrás revisar el avance en tiempo real y las recomendaciones de avance, entregadas por Artemis.</span>
+  </div>
+
+  <!-- Banners de estado -->
+  <div class="banner empty" id="bannerEmpty">
+    <span>⏳</span><span>Aún no hay encuestas registradas. En cuanto lleguen respuestas al formulario aparecerán aquí.</span>
+  </div>
+  <div class="banner error" id="bannerError">
+    <span>⚠️</span><span id="errorText">No se pudo leer la hoja de datos.</span>
+  </div>
+
+  <!-- ==================== KPIs ==================== -->
+  <section>
+    <div class="section-title">Resumen general</div>
+    <div class="kpi-grid">
+      <!-- Meta + barra de progreso -->
+      <div class="kpi meta-card">
+        <div class="label">Avance hacia la meta</div>
+        <div class="meta-top">
+          <div><span class="big" id="kpiTotal">0</span> <small style="opacity:.7"> / <span id="kpiMeta">180</span> encuestas</small></div>
+          <div class="pct" id="kpiPct">0%</div>
+        </div>
+        <div class="progress"><i id="progressBar"></i></div>
+        <div class="meta-foot"><span>Completadas</span><span id="kpiMetaFoot">Meta: 180</span></div>
+      </div>
+
+      <div class="kpi k-naranja"><div class="label">Encuestas hoy</div><div class="value" id="kpiHoy">0</div><div class="sub">registradas hoy</div></div>
+      <div class="kpi k-cian"><div class="label">Barrios cubiertos</div><div class="value" id="kpiBarrios">0<small> / 14</small></div><div class="sub">con ≥1 encuesta</div></div>
+      <div class="kpi k-naranja"><div class="label">Faltantes</div><div class="value" id="kpiFaltan">180</div><div class="sub">para la meta</div></div>
+      <div class="kpi k-cian"><div class="label">Ritmo diario</div><div class="value" id="kpiRitmo">—</div><div class="sub" id="kpiRitmoSub">promedio/día activo</div></div>
+    </div>
+  </section>
+
+  <!-- ==================== MAPA ==================== -->
+  <section>
+    <div class="section-title">Avance por barrio</div>
+    <div class="card">
+      <div id="map"></div>
+      <div class="map-note">Pasa el cursor por un barrio para ver las encuestas realizadas y el porcentaje de cumplimiento frente a su meta. El tamaño del círculo es proporcional al número de encuestas. Coordenadas aproximadas de centroide — verificar antes de uso oficial.</div>
+    </div>
+  </section>
+
+  <div class="two-col">
+    <!-- ==================== FUNDACIÓN ==================== -->
+    <section>
+      <div class="section-title">Avance por Fundación</div>
+      <div class="card">
+        <div class="fund-list" id="fundList">
+          <div class="skeleton">Cargando distribución por fundación…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TIPO ==================== -->
+    <section>
+      <div class="section-title">Avance por tipo de negocio</div>
+      <div class="card"><div class="chart-wrap tall"><canvas id="chartTipo"></canvas></div></div>
+    </section>
+  </div>
+
+  <!-- ==================== RESUMEN POR BARRIO ==================== -->
+  <section>
+    <div class="section-title">Encuestas por barrio</div>
+    <div class="card"><div class="recent" id="recentList"><div class="skeleton">Sin registros todavía.</div></div></div>
+  </section>
+
+  <!-- ==================== PANEL IA (GROQ) — automático ==================== -->
+  <section>
+    <div class="ia-card">
+      <div class="ia-head satin" style="display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-radius: 12px 12px 0 0;">
+        <img src="20.05 Logo Artemis-06 (1).png" alt="Artemis" style="height: 28px; width: auto; display: block;">
+        <h3 style="margin: 0; font-size: 12px; font-weight: 700; color: #ffffff;">te ayuda a interpretar los datos hasta ahora</h3>
+      </div>
+      <div class="ia-body">
+        <p class="desc">Resumen del avance con un mensaje amigable para los gestores de la Fundación Grupo Social y la Fundación Santo Domingo. Se actualiza automáticamente cada vez que llegan nuevas encuestas. Solo usa conteos agregados, nunca datos de los encuestados.</p>
+        <div class="ia-out" id="iaOut">Esperando datos para generar la lectura…</div>
+        <div class="ia-stamp" id="iaStamp"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ==================== FOOTER: ORGANIZACIONES ALIADAS ==================== -->
+<!-- Los 5 logos deben estar junto al HTML -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="flabel">Un proceso de</div>
+    <div class="footer-logos">
+      <img src="1. FGS-logotipo_BLANCO.png" alt="Fundación Grupo Social">
+      <img src="Comuna Seis (B)H.png" alt="Comuna Seis — estrategia de territorio (Fundación Grupo Social)">
+      <img src="3. Fundació-Santo_Domingo-logotipo_BLANCO.png" alt="Fundación Santo Domingo">
+      <img src="4. B - logo Vertical Blanco.png" alt="Estrategia de territorio (Fundación Santo Domingo)">
+      <img src="Logo CLab_Negativo.png" alt="ChangeLab">
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   ⚙️  CONSTANTES CONFIGURABLES — ajusta todo aquí
+   ============================================================ */
+
+/* --- 1. Origen de datos ---
+   El tablero lee los datos a través del backend (app.py), en la ruta /api/datos.
+   El backend es quien lee la hoja "Agregados" del Google Sheet y la reenvía.
+   Ventaja: la lectura funciona siempre y la lógica de Google queda del lado del servidor.
+   (Si algún día quieres leer Google directo desde el navegador, pon aquí la URL CSV pública.) */
+const SHEET_CSV_URL = "/api/datos";
+
+/* --- 2. Estructura de la hoja "Agregados" (por índice de columna, base 0) ---
+   La hoja trae varias tablas en columnas paralelas. Si mueves las tablas en el
+   Sheet, ajusta estos índices. Referencia de la hoja actual:
+     A(0) Barrio        B(1) Encuestas
+     D(3) Fundación     E(4) Meta   F(5) Avance   G(6) %
+     I(8) Tipo          J(9) Encuestas
+     L(11) rótulos/valores de totales (Total encuestas / Encuestas hoy) */
+const IDX = {
+  barrioNombre:0, barrioConteo:1,
+  fundNombre:3, fundMeta:4, fundAvance:5,
+  tipoNombre:8, tipoConteo:9,
+  totalCol:11
+};
+
+/* --- 3. Meta global --- */
+const META = 180;
+
+/* --- 3b. Fundaciones (para orden y colores) --- */
+const FUNDACIONES = ["Fundación Grupo Social","Fundación Santo Domingo"];
+
+/* --- 4. Catálogo de barrios (14 + "Otro") --- */
+const BARRIOS = [
+  "El Pozón","Villa Estrella","Villa Zuldany","Villas de la Candelaria","Nuevo Paraíso",
+  "Fredonia","Olaya Herrera sector El Progreso","Olaya Herrera sector Playas Blancas",
+  "Olaya Herrera sector Zarabanda","Olaya Herrera sector La Magdalena",
+  "Olaya Herrera sector La Puntilla","Ciudad de Bicentenario","Villas de Aranjuez","Colombiatón","Otro"
+];
+const BARRIOS_META = BARRIOS.filter(b => b !== "Otro");
+
+/* --- 5. Coordenadas de centroide (lat, lng) — OSM oficial, salvo zona norte aprox. */
+const COORDS = {
+  // — Coordenadas oficiales de OpenStreetMap (verificadas vía Mapcarta) —
+  "El Pozón":                              [10.413930, -75.459510], // OSM way 1388083413
+  "Villa Estrella":                        [10.403411, -75.463119], // OSM node 1527603913
+  "Villa Zuldany":                         [10.407386, -75.465791], // OSM node 12027324551
+  "Villas de la Candelaria":               [10.401991, -75.461884], // OSM node 4961883128 (parada TransCaribe del barrio)
+  "Nuevo Paraíso":                         [10.407002, -75.470193], // OSM way 1388078302
+  "Fredonia":                              [10.407874, -75.473957], // OSM way 1388078298
+  "Olaya Herrera sector El Progreso":      [10.409773, -75.482308], // OSM way 1388078285
+  "Olaya Herrera sector Playas Blancas":   [10.408931, -75.478994], // OSM way 1388078290
+  "Olaya Herrera sector Zarabanda":        [10.409647, -75.476980], // OSM way 1388078292
+  "Olaya Herrera sector La Magdalena":     [10.405036, -75.476661], // OSM way 1388078294
+  "Olaya Herrera sector La Puntilla":      [10.410222, -75.479901], // OSM way 1388078286
+
+  // — Zona norte (macroproyecto Ciudad del Bicentenario, cerca de Vía Cordialidad) —
+  // ⚠️ APROXIMADAS: OSM no tiene centroide preciso de estos 3. Verificar/ajustar.
+  "Ciudad de Bicentenario":  [10.423782, -75.449723], // polígono grande NE
+  "Villas de Aranjuez":      [10.413726, -75.443048], // dentro/sur de Bicentenario
+  "Colombiatón":             [10.4152695, -75.4442733], // racimo centro (junto a Flor del Campo)
+
+  "Otro":                                  null
+};
+const MAPA_CENTRO = [10.412, -75.475];
+const MAPA_ZOOM   = 13;
+/* --- 6. Polling --- */
+const INTERVALO_MS = 60000; // 60 s
+
+/* --- 7. Lectura por IA (Artemis) ---
+   El tablero NO llama a Groq directamente ni conoce la clave. Le pide la lectura
+   al backend (app.py) en /api/lectura, y el backend usa la clave guardada en .env.
+   La interpretación se regenera automáticamente cada vez que CAMBIA el total de
+   encuestas (una nueva respuesta en el Form). Si el total no cambia, no se gasta
+   ninguna llamada al modelo. */
+const IA_ENDPOINT = "/api/lectura";
+
+/* ============================================================
+   ESTADO INTERNO
+   ============================================================ */
+let AG = null;               // datos agregados ya parseados
+let map, capaMarcadores;
+let chartTipo;
+let ultimoTotalIA = null;    // último total con el que se generó la lectura (para detectar cambios)
+
+/* ============================================================
+   UTILIDADES
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const norm = s => (s==null?"":String(s)).trim();
+const numOf = s => { const n = parseFloat(norm(s).replace(/[^\d.-]/g,"")); return isNaN(n)?0:n; };
+
+/* ============================================================
+   CARGA Y PARSEO DE LA HOJA "AGREGADOS"
+   ============================================================ */
+function cargarDatos(){
+  const icon = $("refreshIcon"), btn = $("btnRefresh");
+  icon.classList.add("spin"); btn.disabled = true;
+
+  Papa.parse(SHEET_CSV_URL, {
+    download:true, header:false, skipEmptyLines:false,
+    complete: res => {
+      try{
+        AG = parsearAgregados(res.data);
+        $("bannerError").classList.remove("show");
+        $("statusDot").classList.remove("error");
+        pintarTodo();
+        revisarIA(); // dispara la lectura IA si toca la franja horaria
+      }catch(err){ console.error(err); mostrarError("Error procesando los datos: "+err.message); }
+      finally{ icon.classList.remove("spin"); btn.disabled=false; marcarActualizado(); }
+    },
+    error: err => {
+      console.error(err);
+      mostrarError("No se pudo leer la hoja de agregados. Revisa que esté publicada como CSV y que la URL sea correcta.");
+      icon.classList.remove("spin"); btn.disabled=false;
+    }
+  });
+}
+function mostrarError(msg){
+  $("errorText").textContent = msg;
+  $("bannerError").classList.add("show");
+  $("statusDot").classList.add("error");
+}
+
+/* Convierte la matriz cruda del CSV en un objeto estructurado.
+   Recorre filas saltando el encabezado (fila 0) y lee cada tabla por su índice de columna. */
+function parsearAgregados(rows){
+  const barrios = {};   // { barrio: conteo }
+  const tipos = [];     // [ {nombre, conteo} ]
+  const fundaciones = {}; // { nombre: {meta, avance} }
+  let totalEncuestas = 0, encuestasHoy = 0;
+
+  rows.forEach((r,i)=>{
+    if(i===0) return; // encabezados
+    // --- barrios ---
+    const bn = norm(r[IDX.barrioNombre]);
+    if(bn) barrios[bn] = numOf(r[IDX.barrioConteo]);
+    // --- tipos ---
+    const tn = norm(r[IDX.tipoNombre]);
+    if(tn) tipos.push({nombre:tn, conteo:numOf(r[IDX.tipoConteo])});
+    // --- fundaciones ---
+    const fn = norm(r[IDX.fundNombre]);
+    if(FUNDACIONES.includes(fn)) fundaciones[fn] = {meta:numOf(r[IDX.fundMeta]), avance:numOf(r[IDX.fundAvance])};
+    // --- totales (columna L: rótulo en esta col, valor en la col de fundación/meta E) ---
+    // La hoja pone "Total encuestas" y "Encuestas hoy" como rótulos y su valor en la fila siguiente.
+    const lc = norm(r[IDX.totalCol]);
+    if(/total\s+encuestas/i.test(lc)) totalEncuestas = numOf(r[IDX.totalCol+1]) || totalEncuestas;
+    if(/encuestas\s+hoy/i.test(lc))   encuestasHoy   = numOf(r[IDX.totalCol+1]);
+  });
+
+  // Respaldo: si no encontró el total en L, súmalo desde los barrios.
+  if(!totalEncuestas) totalEncuestas = Object.values(barrios).reduce((a,b)=>a+b,0);
+
+  return { barrios, tipos, fundaciones, totalEncuestas, encuestasHoy };
+}
+
+/* Un único punto de repintado */
+function pintarTodo(){
+  const vacio = !AG || AG.totalEncuestas===0;
+  $("bannerEmpty").classList.toggle("show", vacio);
+  renderKPIs();
+  renderMapa();
+  renderFundaciones();
+  renderChartTipo();
+  renderRecientes();
+}
+
+/* ============================================================
+   RENDER: KPIs
+   ============================================================ */
+function renderKPIs(){
+  const total = AG.totalEncuestas;
+  const pct = Math.min(100, Math.round(total/META*100));
+  $("kpiTotal").textContent = total;
+  $("kpiMeta").textContent = META;
+  $("kpiPct").textContent = pct+"%";
+  $("progressBar").style.width = pct+"%";
+  $("kpiFaltan").textContent = Math.max(0, META-total);
+  $("kpiHoy").textContent = AG.encuestasHoy;
+
+  const cubiertos = BARRIOS_META.filter(b => (AG.barrios[b]||0) > 0).length;
+  $("kpiBarrios").innerHTML = cubiertos+'<small> / '+BARRIOS_META.length+'</small>';
+
+  // "Ritmo" ya no se puede calcular con fechas (la hoja es agregada). Mostramos avance restante.
+  $("kpiRitmo").textContent = Math.max(0, META-total);
+  $("kpiRitmoSub").textContent = "por alcanzar la meta";
+}
+
+/* ============================================================
+   RENDER: MAPA (marcadores + hover por barrio)
+   Nota: el % por barrio ya no aplica (la meta es por fundación, no por barrio).
+   El tooltip muestra el conteo de encuestas del barrio.
+   ============================================================ */
+
+
+// 2. Función para remover tildes y mayúsculas
+function limpiarTexto(str) {
+  return (str || '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
+// 3. Mapeo para nombres equivalentes entre el GeoJSON y tu lista
+const ALIAS_BARRIOS = {
+  "LA CANDELARIA": "Villas de la Candelaria"
+};
+
+// 4. Renderizado completo
+function getColor(avance) {
+  return avance > 10 ? '#143980' : 
+         avance > 4  ? '#00b2bb' : 
+         avance > 0  ? '#ee6802' : '#a0aab8';
+}
+
+function renderMapa(){
+  if(!map){
+    map = L.map('map', { scrollWheelZoom: false }).setView(MAPA_CENTRO, MAPA_ZOOM);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+    
+    capaMarcadores = L.layerGroup().addTo(map);
+  }
+  
+  capaMarcadores.clearLayers();
+
+  BARRIOS.forEach(b => {
+    const coords = COORDS[b];
+    if (!coords) return;
+
+    const total = AG ? (AG.barrios[b] || 0) : 0;
+    const color = getColor(total);
+    const radio = 8 + Math.min(total * 1.2, 18);
+
+    L.circleMarker(coords, {
+      radius: radio,
+      fillColor: color,
+      color: '#ffffff',
+      weight: 2,
+      fillOpacity: 0.85
+    })
+    .bindTooltip(`
+      <div style="font-family: system-ui, sans-serif; font-size: 13px;">
+        <strong style="color: #143980;">${b}</strong><br/>
+        Encuestas: <b>${total}</b>
+      </div>
+    `, { sticky: true, direction: 'top' })
+    .addTo(capaMarcadores);
+  });
+
+  setTimeout(() => map.invalidateSize(), 200);
+}
+
+/* --- FASE POSTERIOR: mapa de polígonos (infografía por barrio) ---
+   Cuando tengamos el GeoJSON de los 14 barrios, se reemplazará el bloque de
+   marcadores por polígonos coloreados. Cada Feature debe traer properties.barrio
+   con el nombre EXACTO del catálogo BARRIOS. En GeoJSON el orden es [lng, lat]. */
+
+/* ============================================================
+   RENDER: AVANCE POR FUNDACIÓN (lee metas y avance ya calculados)
+   ============================================================ */
+function renderFundaciones(){
+  const cont = $("fundList");
+  cont.innerHTML = FUNDACIONES.map((f,i)=>{
+    const d = AG.fundaciones[f] || {meta:0, avance:0};
+    const pct = d.meta>0 ? Math.round(d.avance/d.meta*100) : 0;
+    const w = Math.min(100,pct);
+    return '<div class="fund f'+(i+1)+'">'+
+      '<div class="fh"><span class="fname">'+f+'</span><span class="fpct">'+pct+'%</span></div>'+
+      '<div class="fcount"><b>'+d.avance+'</b> de '+d.meta+' emprendedores</div>'+
+      '<div class="fbar"><i style="width:'+w+'%"></i></div>'+
+      '<div class="fmeta">'+Math.max(0,d.meta-d.avance)+' por encuestar</div>'+
+    '</div>';
+  }).join("");
+}
+
+/* ============================================================
+   RENDER: GRÁFICO POR TIPO (dona)
+   ============================================================ */
+function renderChartTipo(){
+  const pares = AG.tipos.filter(t=>t.conteo>0).sort((a,b)=>b.conteo-a.conteo);
+  const labels = pares.map(p=>p.nombre), datos = pares.map(p=>p.conteo);
+  const paleta = ["#143980","#ee6802","#00b2bb","#1d4aa0","#f28a3c","#3fc9d0","#2a5fc0","#c95400","#0089a0","#5b7fd4","#ffab5e","#7ad8dd"];
+  const cfg = {
+    type:"doughnut",
+    data:{ labels, datasets:[{ data:datos, backgroundColor:labels.map((_,i)=>paleta[i%paleta.length]), borderWidth:2, borderColor:"#fff" }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:"52%",
+      plugins:{ legend:{position:"bottom", labels:{font:{size:10}, boxWidth:12, padding:8}} } }
+  };
+  if(chartTipo){ chartTipo.data=cfg.data; chartTipo.update(); }
+  else chartTipo = new Chart($("chartTipo"), cfg);
+}
+
+/* ============================================================
+   RENDER: RESUMEN POR BARRIO (reemplaza "últimas encuestas")
+   La hoja agregada no tiene registros individuales; mostramos el
+   conteo por barrio, de mayor a menor.
+   ============================================================ */
+function renderRecientes(){
+  const cont = $("recentList");
+  const pares = BARRIOS.map(b=>[b, AG.barrios[b]||0]).filter(p=>p[1]>0).sort((a,b)=>b[1]-a[1]);
+  if(!pares.length){ cont.innerHTML='<div class="skeleton">Sin encuestas registradas todavía.</div>'; return; }
+  cont.innerHTML = pares.map(([b,n])=>{
+    return '<div class="row">'+
+      '<div><span class="barrio">'+b+'</span></div>'+
+      '<div class="meta-r"><span class="surv-tag">'+n+' encuesta'+(n===1?'':'s')+'</span></div>'+
+    '</div>';
+  }).join("");
+}
+
+/* ============================================================
+   PANEL IA (Artemis) — se regenera cuando cambia el total de encuestas
+   ============================================================ */
+function revisarIA(){
+  if(!AG) return;
+  // primera carga o cambio en el total → regenerar
+  if(ultimoTotalIA === null || AG.totalEncuestas !== ultimoTotalIA){
+    ultimoTotalIA = AG.totalEncuestas;
+    generarLecturaIA();
+  }
+}
+
+function saludoPorHora(){
+  const h = new Date().getHours();
+  if(h < 12) return "Buenos días";
+  if(h < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+async function generarLecturaIA(){
+  const out = $("iaOut"), stamp = $("iaStamp");
+  out.classList.add("show");
+  out.textContent = "Generando la lectura del avance…";
+
+  // arma el resumen a partir de los datos agregados (solo conteos, sin datos personales)
+  const resumen = {
+    meta_global: META,
+    total: AG.totalEncuestas,
+    faltan: Math.max(0, META-AG.totalEncuestas),
+    porcentaje: Math.round(AG.totalEncuestas/META*100),
+    por_fundacion: AG.fundaciones,
+    por_barrio: AG.barrios,
+    por_tipo: Object.fromEntries(AG.tipos.filter(t=>t.conteo>0).map(t=>[t.nombre,t.conteo]))
+  };
+
+  try{
+    const resp = await fetch(IA_ENDPOINT,{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ resumen, saludo: saludoPorHora()+", equipo" })
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error){ throw new Error(data.error || ("HTTP "+resp.status)); }
+    out.textContent = data.texto || "El modelo no devolvió texto.";
+    if(stamp) stamp.textContent = "Actualizada: "+new Date().toLocaleString("es-CO",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+  }catch(err){
+    out.textContent = "No se pudo generar la lectura automática.\n"+err.message;
+  }
+}
+
+/* ============================================================
+   RELOJ / ARRANQUE
+   ============================================================ */
+function marcarActualizado(){
+  const h = new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  $("lastUpdate").textContent = "Última actualización: "+h;
+}
+
+cargarDatos();
+setInterval(cargarDatos, INTERVALO_MS);
+// La lectura IA se revisa dentro de cargarDatos() tras cada refresco de datos
+// (cada 60 s): solo se regenera si el total de encuestas cambió.
+</script>
+</body>
+</html>
