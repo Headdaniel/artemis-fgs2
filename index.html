@@ -687,9 +687,9 @@ function renderMapa(){
 /* ============================================================
    RENDER: AVANCE POR FUNDACIÓN (lee metas y avance ya calculados)
    ============================================================ */
-function renderFundaciones(){
+   function renderFundaciones(){
   const cont = $("fundList");
-  cont.innerHTML = FUNDACIONES.map((f,i)=>{
+  let html = FUNDACIONES.map((f,i)=>{
     const d = AG.fundaciones[f] || {meta:0, avance:0};
     const pct = d.meta>0 ? Math.round(d.avance/d.meta*100) : 0;
     const w = Math.min(100,pct);
@@ -700,6 +700,18 @@ function renderFundaciones(){
       '<div class="fmeta">'+Math.max(0,d.meta-d.avance)+' por encuestar</div>'+
     '</div>';
   }).join("");
+
+  // Línea extra: encuestas en barrios fuera de ambas fundaciones ("Otro")
+  const otro = AG.barrios["Otro"] || 0;
+  if(otro > 0){
+    html += '<div class="fund" style="border-top:1px dashed var(--gris-linea);padding-top:12px">'+
+      '<div class="fh"><span class="fname" style="color:var(--gris-texto)">Otro (fuera de ambas fundaciones)</span>'+
+      '<span class="fpct" style="color:var(--gris-texto)">'+otro+'</span></div>'+
+      '<div class="fmeta">encuesta'+(otro===1?'':'s')+' en barrios que no pertenecen a FGS ni FSD (p. ej. Asturias)</div>'+
+    '</div>';
+  }
+
+  cont.innerHTML = html;
 }
 
 /* ============================================================
