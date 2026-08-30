@@ -276,14 +276,13 @@ section{margin-bottom:20px}
   .btn-refresh{padding:9px 18px}
   .meta-top .big{font-size:28px}
   .kpi .value{font-size:26px}
-   /* Footer móvil: 4 logos en una fila igualada + ChangeLab abajo solo */
-    /* Footer móvil: FGS arriba, FSD en medio, ChangeLab abajo — 3 filas */
-  .footer-logos{display:flex;flex-wrap:wrap;gap:10px 16px;justify-content:center;align-items:center}
-  .footer-logos img{height:30px;flex:0 0 auto}
-  /* saltos de fila: un separador invisible de ancho total tras cada grupo */
-  .footer-logos .lg-fgs:nth-of-type(2){margin-right:100%}
-  .footer-logos .lg-fsd:nth-of-type(2){margin-right:100%}
-  .footer-logos .logo-clab{height:34px;margin-top:2px}
+  /* Footer móvil: FGS (fila 1), FSD (fila 2), ChangeLab (fila 3) */
+  .footer-logos{display:grid;grid-template-columns:auto auto;justify-content:center;
+    align-items:center;gap:16px 22px}
+  .footer-logos img{height:32px}
+  .footer-logos .lg-fgs{grid-row:1}
+  .footer-logos .lg-fsd{grid-row:2}
+  .footer-logos .logo-clab{grid-row:3;grid-column:1 / -1;height:34px;margin-top:4px}
 }
 
 .satin {
