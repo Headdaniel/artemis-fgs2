@@ -620,8 +620,8 @@ function renderKPIs(){
   const fsd = AG.fundaciones["Fundación Santo Domingo"] || {meta:0,avance:0};
   const pctFgs = fgs.meta>0 ? Math.round(fgs.avance/fgs.meta*100) : 0;
   const pctFsd = fsd.meta>0 ? Math.round(fsd.avance/fsd.meta*100) : 0;
-  $("kpiRitmo").innerHTML = pctFgs+'%<small style="font-size:15px"> · '+pctFsd+'%</small>';
-  $("kpiRitmoSub").textContent = "FGS · Santo Domingo";
+  $("kpiRitmo").innerHTML = pctFgs+'% · '+pctFsd+'%';
+  $("kpiRitmoSub").textContent = "Fundación Grupo Social · Fundación Santo Domingo";
 }
 
 /* ============================================================
