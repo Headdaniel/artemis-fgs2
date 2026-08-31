@@ -364,7 +364,7 @@ section{margin-bottom:20px}
       <div class="kpi k-naranja"><div class="label">Encuestas hoy</div><div class="value" id="kpiHoy">0</div><div class="sub">registradas hoy</div></div>
       <div class="kpi k-cian"><div class="label">Barrios cubiertos</div><div class="value" id="kpiBarrios">0<small> / 14</small></div><div class="sub">con ≥1 encuesta</div></div>
       <div class="kpi k-naranja"><div class="label">Faltantes</div><div class="value" id="kpiFaltan">180</div><div class="sub">para la meta</div></div>
-      <div class="kpi k-cian"><div class="label">Ritmo diario</div><div class="value" id="kpiRitmo">—</div><div class="sub" id="kpiRitmoSub">promedio/día activo</div></div>
+      <div class="kpi k-cian"><div class="label">Avance por fundación</div><div class="value" id="kpiRitmo">—</div><div class="sub" id="kpiRitmoSub">promedio/día activo</div></div>
     </div>
   </section>
 
@@ -615,9 +615,13 @@ function renderKPIs(){
   const cubiertos = BARRIOS_META.filter(b => (AG.barrios[b]||0) > 0).length;
   $("kpiBarrios").innerHTML = cubiertos+'<small> / '+BARRIOS_META.length+'</small>';
 
-  // "Ritmo" ya no se puede calcular con fechas (la hoja es agregada). Mostramos avance restante.
-  $("kpiRitmo").textContent = Math.max(0, META-total);
-  $("kpiRitmoSub").textContent = "por alcanzar la meta";
+  // Caja reutilizada: % de avance de cada fundación
+  const fgs = AG.fundaciones["Fundación Grupo Social"] || {meta:0,avance:0};
+  const fsd = AG.fundaciones["Fundación Santo Domingo"] || {meta:0,avance:0};
+  const pctFgs = fgs.meta>0 ? Math.round(fgs.avance/fgs.meta*100) : 0;
+  const pctFsd = fsd.meta>0 ? Math.round(fsd.avance/fsd.meta*100) : 0;
+  $("kpiRitmo").innerHTML = pctFgs+'%<small style="font-size:15px"> · '+pctFsd+'%</small>';
+  $("kpiRitmoSub").textContent = "FGS · Santo Domingo";
 }
 
 /* ============================================================
