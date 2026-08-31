@@ -276,15 +276,16 @@ section{margin-bottom:20px}
   .btn-refresh{padding:9px 18px}
   .meta-top .big{font-size:28px}
   .kpi .value{font-size:26px}
-  /* Footer móvil: FGS+Comuna (fila 1), FSD+Bicentenario (fila 2), ChangeLab (fila 3) */
-  .footer-logos{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:18px 24px}
+  /* Footer móvil: 2 columnas — FGS+Comuna (fila1), SantoDomingo+Bicentenario (fila2), ChangeLab (fila3) */
+  .footer-logos{display:grid;grid-template-columns:1fr 1fr;justify-items:center;align-items:center;
+  gap:20px 18px;max-width:340px;margin:0 auto}
   .footer-logos img{height:34px}
-  /* salto de fila después del 2º logo FGS y del 2º FSD */
-  .footer-logos .lg-fgs:nth-of-type(2){margin-right:9999px}
-  .footer-logos .lg-fsd:nth-of-type(2){margin-right:9999px}
-  /* FSD y Bicentenario más grandes: su PNG trae mucho margen transparente */
-  .footer-logos .lg-fsd{height:48px}
-  .footer-logos .logo-clab{height:34px}
+  .footer-logos .lg-fgs:nth-of-type(1){grid-column:1;grid-row:1}
+  .footer-logos .lg-fgs:nth-of-type(2){grid-column:2;grid-row:1}
+  .footer-logos .lg-fsd:nth-of-type(1){grid-column:1;grid-row:2}
+  .footer-logos .lg-fsd:nth-of-type(2){grid-column:2;grid-row:2}
+  .footer-logos .lg-fsd{height:46px}
+  .footer-logos .logo-clab{grid-column:1 / 3;grid-row:3;height:36px;margin-top:4px}
 }
 
 .satin {
@@ -424,11 +425,11 @@ section{margin-bottom:20px}
   <div class="footer-inner">
     <div class="flabel">Un proceso de</div>
     <div class="footer-logos">
-            <img src="1. FGS-logotipo_BLANCO.png" alt="Fundación Grupo Social" class="lg-fgs">
-      <img src="Comuna Seis (B)H.png" alt="Comuna Seis — estrategia de territorio (Fundación Grupo Social)" class="lg-fgs">
-      <img src="3. Fundació-Santo_Domingo-logotipo_BLANCO.png" alt="Fundación Santo Domingo" class="lg-fsd">
-      <img src="4. B - logo Vertical Blanco.png" alt="Estrategia de territorio (Fundación Santo Domingo)" class="lg-fsd">
-      <img src="Logo CLab_Negativo.png" alt="ChangeLab" class="logo-clab">
+      <img src="1. FGS-logotipo_BLANCO.png" alt="Fundación Grupo Social" class="lg-a">
+      <img src="Comuna Seis (B)H.png" alt="Comuna Seis" class="lg-b">
+      <img src="3. Fundació-Santo_Domingo-logotipo_BLANCO.png" alt="Fundación Santo Domingo" class="lg-c">
+      <img src="4. B - logo Vertical Blanco.png" alt="Ciudad de Bicentenario" class="lg-d">
+      <img src="Logo CLab_Negativo.png" alt="ChangeLab" class="lg-e">
     </div>
   </div>
 </footer>
