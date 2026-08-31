@@ -578,9 +578,8 @@ function parsearAgregados(rows){
     if(FUNDACIONES.includes(fn)) fundaciones[fn] = {meta:numOf(r[IDX.fundMeta]), avance:numOf(r[IDX.fundAvance])};
     // --- totales (columna L: rótulo en esta col, valor en la col de fundación/meta E) ---
     // La hoja pone "Total encuestas" y "Encuestas hoy" como rótulos y su valor en la fila siguiente.
-    const lc = norm(r[IDX.totalCol]);
-    if(/total\s+encuestas/i.test(lc)) totalEncuestas = numOf(r[IDX.totalCol+1]) || totalEncuestas;
-    if(/encuestas\s+hoy/i.test(lc))   encuestasHoy   = numOf(r[IDX.totalCol+1]);
+    if(/total\s+encuestas/i.test(norm(r[3]))) totalEncuestas = numOf(r[4]) || totalEncuestas;
+    if(/encuestas\s+hoy/i.test(norm(r[3])))   encuestasHoy   = numOf(r[4]);
   });
 
   // Respaldo: si no encontró el total en L, súmalo desde los barrios.
